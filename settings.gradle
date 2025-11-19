@@ -1,4 +1,3 @@
-// root settings.gradle — include nested module
 rootProject.name = "New-portraid-app"
 
 include ':PortraitCameraPro_Full:app'
