@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -44,12 +45,10 @@ jobs:
             echo "Gradle wrapper incomplete/missing. Installing system gradle to generate wrapper..."
             sudo apt-get update -y
             sudo apt-get install -y gradle unzip
-            # generate wrapper using a modern gradle so gradle/wrapper/gradle-wrapper.jar is created
             gradle wrapper --gradle-version 8.1.1
             echo "Generated wrapper files:"
             ls -la gradle || true
             ls -la gradle/wrapper || true
-            echo "Created gradlew:"
             ls -la ./gradlew || true
           fi
           chmod +x ./gradlew || true
