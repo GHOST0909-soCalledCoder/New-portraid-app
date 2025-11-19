@@ -11,8 +11,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
-      ANDROID_HOME: ${{ runner.temp }}/android-sdk
+      ANDROID_SDK_ROOT: "${{ runner.temp }}/android-sdk"
+      ANDROID_HOME: "${{ runner.temp }}/android-sdk"
 
     steps:
       - name: Checkout sources
@@ -76,9 +76,9 @@ jobs:
 
       - name: Build nested module :PortraitCameraPro_Full:app (verbose)
         env:
-          ANDROID_HOME: ${{ runner.temp }}/android-sdk
-          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
-          PATH: ${{ runner.temp }}/android-sdk/platform-tools:${{ runner.temp }}/android-sdk/cmdline-tools/latest/bin:$PATH
+          ANDROID_HOME: "${{ runner.temp }}/android-sdk"
+          ANDROID_SDK_ROOT: "${{ runner.temp }}/android-sdk"
+          PATH: "${{ runner.temp }}/android-sdk/platform-tools:${{ runner.temp }}/android-sdk/cmdline-tools/latest/bin:$PATH"
         run: |
           set -euo pipefail
           echo "Starting build for :PortraitCameraPro_Full:app"
