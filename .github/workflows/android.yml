@@ -27,7 +27,8 @@ jobs:
       - name: Install required apt packages
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y unzip wget xz-utils
+          # include findutils (provides xargs), unzip, wget, xz-utils
+          sudo apt-get install -y unzip wget xz-utils findutils
 
       - name: Install Android command line tools and SDK packages
         run: |
@@ -35,7 +36,6 @@ jobs:
           SDK_ROOT="${ANDROID_SDK_ROOT}"
           mkdir -p "$SDK_ROOT/cmdline-tools"
           cd "$SDK_ROOT"
-          echo "Downloading cmdline tools..."
           CLI_ZIP="/tmp/commandlinetools-linux.zip"
           wget -q -O "$CLI_ZIP" "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
           unzip -q "$CLI_ZIP" -d "$SDK_ROOT/cmdline-tools-temp"
@@ -72,19 +72,28 @@ jobs:
             /tmp/gradle-${GRADLE_VER}/bin/gradle wrapper --gradle-version "$GRADLE_VER"
           fi
           chmod +x ./gradlew || true
-          ./gradlew --version || true
+          echo "Downloaded gradle at $GRADLE_DIR"
+          ls -la "$GRADLE_DIR/bin" || true
+          "$GRADLE_DIR/bin/gradle" --version || true
 
-      - name: Build nested module :PortraitCameraPro_Full:app (verbose)
+      - name: Build nested module :PortraitCameraPro_Full:app (use downloaded gradle)
         env:
           ANDROID_HOME: "${{ github.workspace }}/android-sdk"
           ANDROID_SDK_ROOT: "${{ github.workspace }}/android-sdk"
           PATH: "${{ github.workspace }}/android-sdk/platform-tools:${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin:$PATH"
         run: |
           set -euo pipefail
-          echo "Starting build for :PortraitCameraPro_Full:app"
-          ./gradlew :PortraitCameraPro_Full:app:clean :PortraitCameraPro_Full:app:assembleDebug --no-daemon --info --stacktrace || true
-          echo "Attempting root assembleDebug fallback"
-          ./gradlew assembleDebug --no-daemon --info --stacktrace || true
+          GRADLE_BIN="/tmp/gradle-8.1.1/bin/gradle"
+          echo "Using downloaded Gradle: $GRADLE_BIN"
+          if [ -x "$GRADLE_BIN" ]; then
+            "$GRADLE_BIN" :PortraitCameraPro_Full:app:clean :PortraitCameraPro_Full:app:assembleDebug --no-daemon --info --stacktrace || true
+            echo "Also trying root assembleDebug with downloaded gradle (fallback)"
+            "$GRADLE_BIN" assembleDebug --no-daemon --info --stacktrace || true
+          else
+            echo "$GRADLE_BIN not found or not executable — falling back to ./gradlew"
+            chmod +x ./gradlew || true
+            ./gradlew :PortraitCameraPro_Full:app:clean :PortraitCameraPro_Full:app:assembleDebug --no-daemon --info --stacktrace || true
+          fi
 
       - name: Show build outputs and find APK/AAB
         run: |
