@@ -1,0 +1,3 @@
+// settings.gradle
+rootProject.name = "New-portraid-app"
+include ':app'
