@@ -1,4 +1,4 @@
-name: Android CI (generate wrapper if needed)
+name: Android CI - debug inspect & build
 
 on:
   push:
@@ -19,6 +19,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Show repo root
+        run: |
+          echo "===== ROOT ====="
+          pwd
+          ls -la
+          echo "===== FIND gradle files ====="
+          find . -maxdepth 3 -type f -name "build.gradle" -o -name "settings.gradle" -o -name "gradlew" || true
+
+      - name: Show app folder (if exists)
+        run: |
+          if [ -d "./app" ]; then
+            echo "app exists. Listing:"
+            ls -la app || true
+            echo "app/build.gradle (first 200 lines):"
+            sed -n '1,200p' app/build.gradle || true
+          else
+            echo "No app directory at ./app"
+            find . -maxdepth 3 -type d -name "*app*" -print || true
+          fi
+
       - name: Ensure Gradle wrapper exists (generate if missing)
         run: |
           if [ -f "./gradlew" ]; then
@@ -27,16 +47,24 @@ jobs:
             echo "Gradle wrapper not found — installing gradle and generating wrapper..."
             sudo apt-get update -y
             sudo apt-get install -y gradle unzip
-            # generate wrapper using a compatible Gradle version
             gradle wrapper --gradle-version 8.1.1
             ls -lah
           fi
 
       - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew
+        run: chmod +x ./gradlew || true
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: List Gradle projects & tasks (diagnostic)
+        run: |
+          echo "----- gradle projects -----"
+          ./gradlew projects --no-daemon || true
+          echo "----- gradle tasks for root -----"
+          ./gradlew tasks --all --no-daemon || true
+
+      - name: Try build :app:assembleDebug explicitly
+        run: |
+          echo "Running explicit module assemble: ./gradlew :app:assembleDebug --no-daemon"
+          ./gradlew :app:assembleDebug --no-daemon || true
 
       - name: List debug APK folder (for debugging)
         run: ls -lah app/build/outputs/apk/debug || true
