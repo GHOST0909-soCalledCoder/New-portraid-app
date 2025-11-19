@@ -27,7 +27,7 @@ jobs:
       - name: Install required apt packages
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y unzip wget unzip xz-utils
+          sudo apt-get install -y unzip wget xz-utils
 
       - name: Install Android command line tools and SDK packages
         run: |
@@ -36,11 +36,9 @@ jobs:
           mkdir -p "$SDK_ROOT/cmdline-tools"
           cd "$SDK_ROOT"
           echo "Downloading cmdline tools..."
-          # note: URL uses the generic latest commandline tools package
           CLI_ZIP="/tmp/commandlinetools-linux.zip"
           wget -q -O "$CLI_ZIP" "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
           unzip -q "$CLI_ZIP" -d "$SDK_ROOT/cmdline-tools-temp"
-          # Move into proper location expected by sdkmanager
           mkdir -p "$SDK_ROOT/cmdline-tools/latest"
           mv "$SDK_ROOT/cmdline-tools-temp/cmdline-tools/"* "$SDK_ROOT/cmdline-tools/latest/" || true
           rm -rf "$SDK_ROOT/cmdline-tools-temp" "$CLI_ZIP"
