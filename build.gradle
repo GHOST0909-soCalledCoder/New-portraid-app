@@ -1,5 +1,22 @@
-// root settings.gradle — include nested module
-rootProject.name = "New-portraid-app"
+// build.gradle (root project)
 
-include ':PortraitCameraPro_Full:app'
-project(':PortraitCameraPro_Full:app').projectDir = file('PortraitCameraPro_Full/app')
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.1.0"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.21"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+// This file intentionally has no other code.
+// Module-specific configuration lives inside each module's build.gradle file.
