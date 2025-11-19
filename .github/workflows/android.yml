@@ -25,7 +25,14 @@ jobs:
           pwd
           ls -la
           echo "===== FIND gradle files ====="
-          find . -maxdepth 3 -type f -name "build.gradle" -o -name "settings.gradle" -o -name "gradlew" || true
+          find . -maxdepth 4 -type f \( -name "build.gradle" -o -name "settings.gradle" -o -name "gradlew" \) -print || true
+
+      - name: Show candidate module folders
+        run: |
+          echo "Listing top-level dirs:"
+          ls -la
+          echo "Looking for directories that might be modules (app, *camera*, *portrait*):"
+          find . -maxdepth 3 -type d -name "app" -o -name "*portrait*" -o -name "*camera*" -print || true
 
       - name: Show app folder (if exists)
         run: |
@@ -36,7 +43,8 @@ jobs:
             sed -n '1,200p' app/build.gradle || true
           else
             echo "No app directory at ./app"
-            find . -maxdepth 3 -type d -name "*app*" -print || true
+            echo "Looking for any module/build.gradle files:"
+            find . -maxdepth 4 -type f -name "build.gradle" -print || true
           fi
 
       - name: Ensure Gradle wrapper exists (generate if missing)
@@ -61,16 +69,30 @@ jobs:
           echo "----- gradle tasks for root -----"
           ./gradlew tasks --all --no-daemon || true
 
-      - name: Try build :app:assembleDebug explicitly
+      - name: Try build :app:assembleDebug explicitly (if module named app)
         run: |
-          echo "Running explicit module assemble: ./gradlew :app:assembleDebug --no-daemon"
-          ./gradlew :app:assembleDebug --no-daemon || true
+          echo "Attempting explicit ./gradlew :app:assembleDebug --no-daemon"
+          ./gradlew :app:assembleDebug --no-daemon || echo "explicit :app:assembleDebug failed or :app module not present"
 
-      - name: List debug APK folder (for debugging)
-        run: ls -lah app/build/outputs/apk/debug || true 
+      - name: Try build assembleDebug (root)
+        run: |
+          echo "Attempting fallback ./gradlew assembleDebug --no-daemon"
+          ./gradlew assembleDebug --no-daemon || echo "assembleDebug failed (may be module name mismatch); continuing to search for any APKs"
 
-      - name: Upload APK artifact
+      - name: Find all APKs in the workspace
+        run: |
+          echo "Searching entire workspace for APK files..."
+          find . -type f -name "*.apk" -print || true
+
+      - name: Show debug APK folder (if app folder exists)
+        run: |
+          echo "Listing common apk output locations (for debugging):"
+          ls -lah app/build/outputs/apk/debug || true
+          ls -lah */build/outputs/apk/debug || true
+          ls -lah build/outputs/apk || true
+
+      - name: Upload any APK artifacts found
         uses: actions/upload-artifact@v4
         with:
-          name: PortraitCamera-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: PortraitCamera-APKs
+          path: "**/*.apk"
