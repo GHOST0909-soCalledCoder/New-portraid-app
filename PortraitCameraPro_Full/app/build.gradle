@@ -1,4 +1,5 @@
-// Module: app (app/build.gradle)
+// Module: PortraitCameraPro_Full/app
+
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 
@@ -12,19 +13,16 @@ android {
         targetSdk 34
         versionCode 1
         versionName "1.0"
-
-        // If you ever enable multiDex, add:
-        // multiDexEnabled true
     }
 
     buildTypes {
         release {
-            // For now keep proguard off while developing
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                    'proguard-rules.pro'
         }
         debug {
-            // keep default debug config
+            // Default debug settings
         }
     }
 
@@ -37,11 +35,18 @@ android {
         jvmTarget = "17"
     }
 
-    // Optional: increase build cache friendliness and avoid packaging conflicts
     packagingOptions {
         resources {
-            excludes += ['META-INF/DEPENDENCIES', 'META-INF/NOTICE', 'META-INF/LICENSE']
+            excludes += [
+                    'META-INF/DEPENDENCIES',
+                    'META-INF/NOTICE',
+                    'META-INF/LICENSE'
+            ]
         }
+    }
+
+    buildFeatures {
+        viewBinding true
     }
 }
 
@@ -51,16 +56,16 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.9.0'
 
-    // CameraX core libraries (update versions if Android Studio recommends newer)
+    // CameraX
     implementation "androidx.camera:camera-core:1.2.3"
     implementation "androidx.camera:camera-camera2:1.2.3"
     implementation "androidx.camera:camera-lifecycle:1.2.3"
     implementation "androidx.camera:camera-view:1.2.3"
 
-    // ML Kit Selfie Segmentation (on-device). Please update to latest stable if available.
+    // ML Kit Selfie Segmentation
     implementation "com.google.mlkit:segmentation-selfie:16.0.0-beta6"
 
-    // Lifecycle + Activity KTX
+    // Lifecycle
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
     implementation 'androidx.activity:activity-ktx:1.7.2'
 }
