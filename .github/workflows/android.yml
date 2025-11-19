@@ -1,4 +1,4 @@
-name: Android CI - build PortraitCameraPro_Full/app and upload APKs (use downloaded Gradle)
+name: Android CI - build PortraitCameraPro_Full/app (with SDK & Gradle)
 
 on:
   push:
@@ -10,6 +10,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+      ANDROID_HOME: ${{ runner.temp }}/android-sdk
+
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
@@ -20,43 +24,81 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Ensure Gradle wrapper exists (generate if missing) using downloaded Gradle
+      - name: Install required apt packages
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y unzip wget unzip xz-utils
+
+      - name: Install Android command line tools and SDK packages
         run: |
           set -euo pipefail
-          echo "Checking for gradle wrapper files..."
+          SDK_ROOT="${ANDROID_SDK_ROOT}"
+          mkdir -p "$SDK_ROOT/cmdline-tools"
+          cd "$SDK_ROOT"
+          echo "Downloading cmdline tools..."
+          # note: URL uses the generic latest commandline tools package
+          CLI_ZIP="/tmp/commandlinetools-linux.zip"
+          wget -q -O "$CLI_ZIP" "https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip"
+          unzip -q "$CLI_ZIP" -d "$SDK_ROOT/cmdline-tools-temp"
+          # Move into proper location expected by sdkmanager
+          mkdir -p "$SDK_ROOT/cmdline-tools/latest"
+          mv "$SDK_ROOT/cmdline-tools-temp/cmdline-tools/"* "$SDK_ROOT/cmdline-tools/latest/" || true
+          rm -rf "$SDK_ROOT/cmdline-tools-temp" "$CLI_ZIP"
+          export PATH="$SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+          yes | sdkmanager --sdk_root="$SDK_ROOT" --licenses || true
+          sdkmanager --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
+          echo "Installed SDK packages."
+          ls -la "$SDK_ROOT"
+
+      - name: Verify Android SDK and tools
+        run: |
+          export PATH="${ANDROID_SDK_ROOT}/platform-tools:${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:$PATH"
+          echo "SDK root: $ANDROID_SDK_ROOT"
+          sdkmanager --version || true
+          adb --version || true
+          java -version
+
+      - name: Download Gradle 8.1.1 and generate wrapper if missing
+        run: |
+          set -euo pipefail
+          GRADLE_VER="8.1.1"
+          GRADLE_ZIP="/tmp/gradle-${GRADLE_VER}-bin.zip"
+          GRADLE_DIR="/tmp/gradle-${GRADLE_VER}"
           if [ -f "./gradle/wrapper/gradle-wrapper.jar" ] && [ -x "./gradlew" ]; then
-            echo "Gradle wrapper JAR and gradlew script found."
+            echo "Gradle wrapper present in repo."
           else
-            echo "Gradle wrapper missing or incomplete. Downloading Gradle 8.1.1 and generating wrapper..."
-            GRADLE_VER="8.1.1"
-            GRADLE_ZIP="/tmp/gradle-${GRADLE_VER}-bin.zip"
-            GRADLE_DIR="/tmp/gradle-${GRADLE_VER}"
+            echo "Downloading Gradle ${GRADLE_VER}..."
             wget -q -O "$GRADLE_ZIP" "https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip"
             unzip -q "$GRADLE_ZIP" -d /tmp
-            export PATH="$GRADLE_DIR/bin:$PATH"
-            echo "Using $GRADLE_DIR/bin/gradle to generate wrapper..."
-            "$GRADLE_DIR/bin/gradle" wrapper --gradle-version "$GRADLE_VER"
-            echo "Wrapper generated. Listing files:"
-            ls -la gradle || true
-            ls -la gradle/wrapper || true
-            ls -la ./gradlew || true
+            echo "Generating gradle wrapper using downloaded gradle..."
+            /tmp/gradle-${GRADLE_VER}/bin/gradle wrapper --gradle-version "$GRADLE_VER"
           fi
           chmod +x ./gradlew || true
+          ./gradlew --version || true
 
-      - name: Build module PortraitCameraPro_Full:app (assembleDebug)
+      - name: Build nested module :PortraitCameraPro_Full:app (verbose)
+        env:
+          ANDROID_HOME: ${{ runner.temp }}/android-sdk
+          ANDROID_SDK_ROOT: ${{ runner.temp }}/android-sdk
+          PATH: ${{ runner.temp }}/android-sdk/platform-tools:${{ runner.temp }}/android-sdk/cmdline-tools/latest/bin:$PATH
         run: |
           set -euo pipefail
-          echo "Building nested module :PortraitCameraPro_Full:app"
+          echo "Starting build for :PortraitCameraPro_Full:app"
           ./gradlew :PortraitCameraPro_Full:app:clean :PortraitCameraPro_Full:app:assembleDebug --no-daemon --info --stacktrace || true
-          echo "Also trying root assembleDebug (fallback)"
+          echo "Attempting root assembleDebug fallback"
           ./gradlew assembleDebug --no-daemon --info --stacktrace || true
 
-      - name: Find APKs / AABs
+      - name: Show build outputs and find APK/AAB
         run: |
-          echo "Searching for APK/AAB files under the repo..."
+          echo "Listing possible output directories..."
+          find . -type d -name "build" -prune -print || true
+          echo "Searching for any .apk or .aab files produced:"
           find . -type f \( -iname "*.apk" -o -iname "*.aab" \) -print || true
+          echo "Show specific nested module outputs:"
+          ls -la PortraitCameraPro_Full/app/build/outputs || true
+          find PortraitCameraPro_Full/app/build/outputs -type f -print || true
 
-      - name: Collect outputs into a zip for upload
+      - name: Collect outputs into zip
         run: |
           mkdir -p ci_outputs
           find . -type f \( -iname "*.apk" -o -iname "*.aab" \) -exec cp {} ci_outputs/ \; || true
@@ -65,11 +107,12 @@ jobs:
             mkdir -p "$dest"
             cp -r "$d"/* "$dest/" 2>/dev/null || true
           done
-          echo "Contents to upload:"
-          ls -la ci_outputs || true
+          echo "Zipping ci_outputs..."
           zip -r portrait-apks.zip ci_outputs || true
+          echo "Zip contents:"
+          ls -la portrait-apks.zip || true
 
-      - name: Upload APK/AAB artifact
+      - name: Upload artifact (APK/AAB zip)
         uses: actions/upload-artifact@v4
         with:
           name: portrait-apks
