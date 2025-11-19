@@ -1,4 +1,0 @@
-<resources>
-    <style name="Theme.PortraitCamera" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-    </style>
-</resources>
