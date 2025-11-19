@@ -1,10 +1,11 @@
-name: Android CI - debug inspect & build
+name: Android CI - build PortraitCameraPro_Full/app and upload APKs
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,58 +20,48 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Show repo root
-        run: |
-          echo "===== ROOT ====="
-          pwd
-          ls -la
-          echo "===== FIND gradle files ====="
-          find . -maxdepth 3 -type f -name "build.gradle" -o -name "settings.gradle" -o -name "gradlew" || true
-
-      - name: Show app folder (if exists)
-        run: |
-          if [ -d "./app" ]; then
-            echo "app exists. Listing:"
-            ls -la app || true
-            echo "app/build.gradle (first 200 lines):"
-            sed -n '1,200p' app/build.gradle || true
-          else
-            echo "No app directory at ./app"
-            find . -maxdepth 3 -type d -name "*app*" -print || true
-          fi
-
       - name: Ensure Gradle wrapper exists (generate if missing)
         run: |
-          if [ -f "./gradlew" ]; then
-            echo "Gradle wrapper found."
+          if [ -f "./gradle/wrapper/gradle-wrapper.jar" ] && [ -x "./gradlew" ]; then
+            echo "Gradle wrapper present"
           else
-            echo "Gradle wrapper not found — installing gradle and generating wrapper..."
+            echo "Gradle wrapper missing — installing system gradle and generating wrapper..."
             sudo apt-get update -y
             sudo apt-get install -y gradle unzip
             gradle wrapper --gradle-version 8.1.1
-            ls -lah
           fi
+          chmod +x ./gradlew || true
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew || true
-
-      - name: List Gradle projects & tasks (diagnostic)
+      - name: Build module PortraitCameraPro_Full:app (assembleDebug)
         run: |
-          echo "----- gradle projects -----"
-          ./gradlew projects --no-daemon || true
-          echo "----- gradle tasks for root -----"
-          ./gradlew tasks --all --no-daemon || true
+          set -euo pipefail
+          echo "Building nested module :PortraitCameraPro_Full:app"
+          ./gradlew :PortraitCameraPro_Full:app:clean :PortraitCameraPro_Full:app:assembleDebug --no-daemon --info --stacktrace || true
+          echo "Also trying root assembleDebug (fallback)"
+          ./gradlew assembleDebug --no-daemon --info --stacktrace || true
 
-      - name: Try build :app:assembleDebug explicitly
+      - name: Find APKs / AABs
         run: |
-          echo "Running explicit module assemble: ./gradlew :app:assembleDebug --no-daemon"
-          ./gradlew :app:assembleDebug --no-daemon || true
+          echo "Searching for APK/AAB files under the repo..."
+          find . -type f \( -iname "*.apk" -o -iname "*.aab" \) -print || true
 
-      - name: List debug APK folder (for debugging)
-        run: ls -lah app/build/outputs/apk/debug || true 
+      - name: Collect outputs into a zip for upload
+        run: |
+          mkdir -p ci_outputs
+          # copy any discovered apk/aab into ci_outputs
+          find . -type f \( -iname "*.apk" -o -iname "*.aab" \) -exec cp {} ci_outputs/ \; || true
+          # also copy common build outputs folders just in case
+          for d in $(find . -type d -name outputs); do
+            dest="ci_outputs/$(echo $d | sed 's|^./||' | sed 's|/|_|g')"
+            mkdir -p "$dest"
+            cp -r "$d"/* "$dest/" 2>/dev/null || true
+          done
+          echo "Contents to upload:"
+          ls -la ci_outputs || true
+          zip -r portrait-apks.zip ci_outputs || true
 
-      - name: Upload APK artifact
+      - name: Upload APK/AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PortraitCamera-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: portrait-apks
+          path: portrait-apks.zip
