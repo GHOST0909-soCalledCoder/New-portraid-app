@@ -68,6 +68,10 @@ jobs:
 
       - name: List debug APK folder (for debugging)
         run: ls -lah app/build/outputs/apk/debug || true
+- name: Find all APKs in the project
+  run: |
+    echo "Searching entire workspace for APKs..."
+    find . -type f -name "*.apk" -print || true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
