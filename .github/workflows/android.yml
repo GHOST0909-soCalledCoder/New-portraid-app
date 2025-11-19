@@ -1,4 +1,4 @@
-name: Android CI
+name: Android CI (generate wrapper if needed)
 
 on:
   push:
@@ -10,25 +10,39 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout sources
-      uses: actions/checkout@v4
+      - name: Checkout sources
+        uses: actions/checkout@v4
 
-    - name: Setup JDK 17
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+      - name: Setup JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
 
-    - name: Make Gradle wrapper executable
-      run: chmod +x ./gradlew
+      - name: Ensure Gradle wrapper exists (generate if missing)
+        run: |
+          if [ -f "./gradlew" ]; then
+            echo "Gradle wrapper found."
+          else
+            echo "Gradle wrapper not found — installing gradle and generating wrapper..."
+            sudo apt-get update -y
+            sudo apt-get install -y gradle unzip
+            # generate wrapper using a compatible Gradle version
+            gradle wrapper --gradle-version 8.1.1
+            ls -lah
+          fi
 
-    - name: Build Debug APK
-      run: ./gradlew assembleDebug --no-daemon
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
 
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: PortraitCamera-APK
-        path: app/build/outputs/apk/debug/*.apk
-        # if-no-files-found: error   # optional: fail job if not found
-        
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: List debug APK folder (for debugging)
+        run: ls -lah app/build/outputs/apk/debug || true
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PortraitCamera-APK
+          path: app/build/outputs/apk/debug/*.apk
