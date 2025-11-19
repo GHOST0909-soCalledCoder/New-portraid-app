@@ -1,4 +1,4 @@
-name: Android CI - build PortraitCameraPro_Full/app and upload APKs
+name: Android CI - build PortraitCameraPro_Full/app and upload APKs (use downloaded Gradle)
 
 on:
   push:
@@ -20,15 +20,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Ensure Gradle wrapper exists (generate if missing)
+      - name: Ensure Gradle wrapper exists (generate if missing) using downloaded Gradle
         run: |
+          set -euo pipefail
+          echo "Checking for gradle wrapper files..."
           if [ -f "./gradle/wrapper/gradle-wrapper.jar" ] && [ -x "./gradlew" ]; then
-            echo "Gradle wrapper present"
+            echo "Gradle wrapper JAR and gradlew script found."
           else
-            echo "Gradle wrapper missing — installing system gradle and generating wrapper..."
-            sudo apt-get update -y
-            sudo apt-get install -y gradle unzip
-            gradle wrapper --gradle-version 8.1.1
+            echo "Gradle wrapper missing or incomplete. Downloading Gradle 8.1.1 and generating wrapper..."
+            GRADLE_VER="8.1.1"
+            GRADLE_ZIP="/tmp/gradle-${GRADLE_VER}-bin.zip"
+            GRADLE_DIR="/tmp/gradle-${GRADLE_VER}"
+            wget -q -O "$GRADLE_ZIP" "https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip"
+            unzip -q "$GRADLE_ZIP" -d /tmp
+            export PATH="$GRADLE_DIR/bin:$PATH"
+            echo "Using $GRADLE_DIR/bin/gradle to generate wrapper..."
+            "$GRADLE_DIR/bin/gradle" wrapper --gradle-version "$GRADLE_VER"
+            echo "Wrapper generated. Listing files:"
+            ls -la gradle || true
+            ls -la gradle/wrapper || true
+            ls -la ./gradlew || true
           fi
           chmod +x ./gradlew || true
 
@@ -48,9 +59,7 @@ jobs:
       - name: Collect outputs into a zip for upload
         run: |
           mkdir -p ci_outputs
-          # copy any discovered apk/aab into ci_outputs
           find . -type f \( -iname "*.apk" -o -iname "*.aab" \) -exec cp {} ci_outputs/ \; || true
-          # also copy common build outputs folders just in case
           for d in $(find . -type d -name outputs); do
             dest="ci_outputs/$(echo $d | sed 's|^./||' | sed 's|/|_|g')"
             mkdir -p "$dest"
