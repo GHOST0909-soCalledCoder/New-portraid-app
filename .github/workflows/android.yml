@@ -1,10 +1,10 @@
-name: Android CI - debug inspect & build
+name: Android CI - build & collect outputs
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -19,80 +19,70 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Show repo root
+      - name: Show repo root & key files
         run: |
-          echo "===== ROOT ====="
-          pwd
+          echo "PWD: $(pwd)"
+          echo "Top-level files:"
           ls -la
-          echo "===== FIND gradle files ====="
-          find . -maxdepth 4 -type f \( -name "build.gradle" -o -name "settings.gradle" -o -name "gradlew" \) -print || true
-
-      - name: Show candidate module folders
-        run: |
-          echo "Listing top-level dirs:"
-          ls -la
-          echo "Looking for directories that might be modules (app, *camera*, *portrait*):"
-          find . -maxdepth 3 -type d -name "app" -o -name "*portrait*" -o -name "*camera*" -print || true
-
-      - name: Show app folder (if exists)
-        run: |
-          if [ -d "./app" ]; then
-            echo "app exists. Listing:"
-            ls -la app || true
-            echo "app/build.gradle (first 200 lines):"
-            sed -n '1,200p' app/build.gradle || true
-          else
-            echo "No app directory at ./app"
-            echo "Looking for any module/build.gradle files:"
-            find . -maxdepth 4 -type f -name "build.gradle" -print || true
-          fi
+          echo "Find build.gradle / settings.gradle / AndroidManifest.xml"
+          find . -maxdepth 4 -type f \( -name "build.gradle" -o -name "settings.gradle" -o -name "AndroidManifest.xml" \) -print || true
 
       - name: Ensure Gradle wrapper exists (generate if missing)
         run: |
           if [ -f "./gradlew" ]; then
-            echo "Gradle wrapper found."
+            echo "gradlew found"
           else
-            echo "Gradle wrapper not found — installing gradle and generating wrapper..."
+            echo "gradlew not found, generating wrapper via system gradle"
             sudo apt-get update -y
             sudo apt-get install -y gradle unzip
             gradle wrapper --gradle-version 8.1.1
-            ls -lah
           fi
+          chmod +x ./gradlew || true
 
-      - name: Make Gradle wrapper executable
-        run: chmod +x ./gradlew || true
-
-      - name: List Gradle projects & tasks (diagnostic)
+      - name: Run Gradle build (assembleDebug)
         run: |
-          echo "----- gradle projects -----"
-          ./gradlew projects --no-daemon || true
-          echo "----- gradle tasks for root -----"
-          ./gradlew tasks --all --no-daemon || true
+          set -x
+          ./gradlew :PortraitCameraPro_Full:app:clean :PortraitCameraPro_Full:app:assembleDebug --no-daemon || true
+          # also try root assemble in case settings includes other modules
+          ./gradlew assembleDebug --no-daemon || true
 
-      - name: Try build :app:assembleDebug explicitly (if module named app)
+      - name: Show generated artifacts (find .apk, .aab)
         run: |
-          echo "Attempting explicit ./gradlew :app:assembleDebug --no-daemon"
-          ./gradlew :app:assembleDebug --no-daemon || echo "explicit :app:assembleDebug failed or :app module not present"
+          echo "=== Searching for APK / AAB files ==="
+          find . -type f \( -iname "*.apk" -o -iname "*.aab" \) -print || true
+          echo "=== Show outputs folders (summary) ==="
+          du -sh ./* || true
+          echo "=== PortraitCameraPro_Full/app build outputs (if exist) ==="
+          if [ -d "PortraitCameraPro_Full/app/build/outputs" ]; then
+            ls -la PortraitCameraPro_Full/app/build/outputs || true
+            find PortraitCameraPro_Full/app/build/outputs -maxdepth 3 -type f -print || true
+          else
+            echo "No outputs at PortraitCameraPro_Full/app/build/outputs"
+          fi
+          echo "=== Any other module outputs: */build/outputs ==="
+          find . -maxdepth 3 -type d -name "build" -exec sh -c 'ls -la "{}"/outputs || true' \; || true
 
-      - name: Try build assembleDebug (root)
+      - name: Zip entire outputs folder (all modules) for download
         run: |
-          echo "Attempting fallback ./gradlew assembleDebug --no-daemon"
-          ./gradlew assembleDebug --no-daemon || echo "assembleDebug failed (may be module name mismatch); continuing to search for any APKs"
+          mkdir -p ci_artifacts
+          # copy any outputs we find into a single folder
+          for d in $(find . -type d -name outputs); do
+            target="ci_artifacts/$(echo $d | sed 's|^./||' | sed 's|/|_|g')"
+            mkdir -p "$target"
+            cp -r "$d"/* "$target/" 2>/dev/null || true
+          done
+          # also include top-level build outputs if present
+          if [ -d "build/outputs" ]; then
+            mkdir -p ci_artifacts/root_build_outputs
+            cp -r build/outputs/* ci_artifacts/root_build_outputs/ 2>/dev/null || true
+          fi
+          # list what we will upload
+          echo "Contents to upload:"
+          find ci_artifacts -type f -maxdepth 5 -print || true
+          zip -r portrait_outputs.zip ci_artifacts || true
 
-      - name: Find all APKs in the workspace
-        run: |
-          echo "Searching entire workspace for APK files..."
-          find . -type f -name "*.apk" -print || true
-
-      - name: Show debug APK folder (if app folder exists)
-        run: |
-          echo "Listing common apk output locations (for debugging):"
-          ls -lah app/build/outputs/apk/debug || true
-          ls -lah */build/outputs/apk/debug || true
-          ls -lah build/outputs/apk || true
-
-      - name: Upload any APK artifacts found
+      - name: Upload build outputs zip
         uses: actions/upload-artifact@v4
         with:
-          name: PortraitCamera-APKs
-          path: "**/*.apk"
+          name: portrait-outputs
+          path: portrait_outputs.zip
