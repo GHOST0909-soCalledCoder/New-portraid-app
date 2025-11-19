@@ -1,5 +1,4 @@
-// build.gradle (root project)
-
+// Top-level build file
 buildscript {
     repositories {
         google()
@@ -17,6 +16,3 @@ allprojects {
         mavenCentral()
     }
 }
-
-// This file intentionally has no other code.
-// Module-specific configuration lives inside each module's build.gradle file.
