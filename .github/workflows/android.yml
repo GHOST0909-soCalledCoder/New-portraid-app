@@ -1,4 +1,4 @@
-name: Android CI - build PortraitCameraPro_Full/app (with SDK & Gradle)
+name: Android CI - build PortraitCameraPro_Full/app (fixed PATH handling, SDK & Gradle)
 
 on:
   push:
@@ -10,6 +10,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # don't override PATH here — we will extend PATH inside run steps
     env:
       ANDROID_SDK_ROOT: "${{ github.workspace }}/android-sdk"
       ANDROID_HOME: "${{ github.workspace }}/android-sdk"
@@ -42,6 +43,7 @@ jobs:
           mkdir -p "$SDK_ROOT/cmdline-tools/latest"
           mv "$SDK_ROOT/cmdline-tools-temp/cmdline-tools/"* "$SDK_ROOT/cmdline-tools/latest/" || true
           rm -rf "$SDK_ROOT/cmdline-tools-temp" "$CLI_ZIP"
+          # prepend sdkmanager path into the *existing* PATH so system tools stay available
           export PATH="$SDK_ROOT/cmdline-tools/latest/bin:$PATH"
           yes | sdkmanager --sdk_root="$SDK_ROOT" --licenses || true
           sdkmanager --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0" "cmdline-tools;latest"
@@ -50,6 +52,7 @@ jobs:
 
       - name: Verify Android SDK and tools
         run: |
+          # update PATH at runtime (do not override the runner PATH)
           export PATH="${ANDROID_SDK_ROOT}/platform-tools:${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:$PATH"
           echo "SDK root: $ANDROID_SDK_ROOT"
           sdkmanager --version || true
@@ -76,16 +79,16 @@ jobs:
           ls -la "$GRADLE_DIR/bin" || true
           "$GRADLE_DIR/bin/gradle" --version || true
 
-      - name: Build nested module :PortraitCameraPro_Full:app (use downloaded gradle)
-        env:
-          ANDROID_HOME: "${{ github.workspace }}/android-sdk"
-          ANDROID_SDK_ROOT: "${{ github.workspace }}/android-sdk"
-          PATH: "${{ github.workspace }}/android-sdk/platform-tools:${{ github.workspace }}/android-sdk/cmdline-tools/latest/bin:$PATH"
+      - name: Build nested module :PortraitCameraPro_Full:app (use downloaded gradle, preserve PATH)
         run: |
           set -euo pipefail
+          # ensure SDK tools are available at front of PATH but keep system PATH so uname/xargs work
+          export PATH="${ANDROID_SDK_ROOT}/platform-tools:${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin:$PATH"
+          echo "Current PATH: $PATH"
           GRADLE_BIN="/tmp/gradle-8.1.1/bin/gradle"
           echo "Using downloaded Gradle: $GRADLE_BIN"
           if [ -x "$GRADLE_BIN" ]; then
+            # use downloaded gradle binary (this is a self-contained launcher)
             "$GRADLE_BIN" :PortraitCameraPro_Full:app:clean :PortraitCameraPro_Full:app:assembleDebug --no-daemon --info --stacktrace || true
             echo "Also trying root assembleDebug with downloaded gradle (fallback)"
             "$GRADLE_BIN" assembleDebug --no-daemon --info --stacktrace || true
