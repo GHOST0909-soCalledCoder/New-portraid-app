@@ -3,50 +3,14 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <androidx.camera.view.PreviewView
-        android:id="@+id/previewView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
-
-    <ImageView
-        android:id="@+id/resultPreview"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:visibility="gone"
-        android:scaleType="fitCenter"
-        android:background="#77000000"/>
-
-    <LinearLayout
-        android:orientation="horizontal"
-        android:layout_width="match_parent"
+    <!-- Visible proof UI is working -->
+    <TextView
+        android:id="@+id/debug_text"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:padding="16dp"
-        android:gravity="center">
+        android:text="UI is working — MainActivity visible"
+        android:textSize="20sp"
+        android:layout_gravity="center" />
 
-        <ImageButton
-            android:id="@+id/btn_mode"
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:src="@android:drawable/ic_menu_camera"
-            android:background="@android:color/transparent"
-            android:contentDescription="Mode" />
-
-        <SeekBar
-            android:id="@+id/seek_zoom"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:max="200" />
-
-        <ImageButton
-            android:id="@+id/btn_shutter"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:src="@android:drawable/ic_menu_camera"
-            android:background="@android:color/transparent"
-            android:contentDescription="Shutter" />
-
-    </LinearLayout>
-
+    <!-- Replace this with your preview Surface/PreviewView when camera OK -->
 </FrameLayout>
